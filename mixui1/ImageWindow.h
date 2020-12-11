@@ -115,6 +115,7 @@ public:
 	}
 
 	void ClearBuffer() {
+		enable = false;
 		if (imagebuf != nullptr) {
 			free(imagebuf);
 			imagebuf = nullptr;

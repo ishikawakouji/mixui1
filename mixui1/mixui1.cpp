@@ -1,8 +1,6 @@
 ﻿// mixui1.cpp : このファイルには 'main' 関数が含まれています。プログラム実行の開始と終了がそこで行われます。
 //
 
-#include "opencv2/opencv.hpp"
-#include "opencv2/imgproc/types_c.h"
 #include <iostream>
 #include "nfd.h"
 #include <filesystem>
@@ -42,7 +40,16 @@ static void glfw_error_callback(int error, const char* description)
     fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 }
 
+#include <opencv2/opencv.hpp>
+#include <opencv2/imgproc/types_c.h>
+
 #include "ImageWindow.h"
+
+/*
+* 合成処理
+* undef max の都合で本体は最後へ
+*/
+extern void mixImage(int& imageViewHeight, int& imageViewWidth, int numberMix, int numberPitch, std::vector<cv::Mat>& imageBuffer, cv::Mat& imageRes);
 
 // グローバル
 int glfwWidth = 640;
@@ -129,7 +136,8 @@ int main()
 
     // NFD用
     nfdchar_t* outFolder = nullptr;
-    nfdresult_t result;
+    nfdresult_t nfdResult;
+    nfdpathset_t outfiles;
 
     // 合成処理
     bool flagMixOpe = false;
@@ -147,6 +155,14 @@ int main()
     int imageViewWidth = 0;
     int imageViewHeight = 0;
     int imageViewChannels = 0;
+
+    // 頭文字
+    char atama[20] = { "RGB" };
+
+    // 接続するファイルの確認
+    int rgb = 0;
+    bool BayerRG = true;
+    int outch = CV_8UC3;
 
     // Main loop
     while (!glfwWindowShouldClose(window))
@@ -171,6 +187,10 @@ int main()
         */
         ImGui::SetNextWindowSize(ImVec2(0.f, 0.f));
         ImGui::Begin("Image Folder");
+        ImGui::Text(u8"連続画像の合成");
+
+        // 頭文字
+        ImGui::InputText("head", atama, 20);
 
         // フォルダ、指定済みか
         static bool pickedFolder = false;
@@ -182,10 +202,44 @@ int main()
         static std::vector<std::string> fileNames;
 
         if (ImGui::Button("Set Folder")) {
-            // NFD呼び出し
-            result = NFD_PickFolder(nullptr, &outFolder);
+            // 頭文字チェック
+            std::string namehead(atama);
 
-            if (result == NFD_OKAY) {
+            switch (namehead.at(0)) {
+            case '2':
+                rgb = 0;
+                BayerRG = true;
+                outch = CV_8UC3;
+                break;
+            case 'H':
+            case 'M':
+                rgb = 0;
+                BayerRG = false;
+                outch = CV_8UC1;
+                break;
+            case 'K':
+                if (namehead == "Kizu") {
+                    rgb = 0;
+                    outch = CV_8UC1;
+                }
+                else {
+                    rgb = 1;
+                    outch = CV_8UC3;
+                }
+                BayerRG = false;
+                break;
+            default:
+                // RGB
+                rgb = 1;
+                BayerRG = false;
+                outch = CV_8UC3;
+            }
+
+
+            // NFD呼び出し
+            nfdResult = NFD_PickFolder(nullptr, &outFolder);
+
+            if (nfdResult == NFD_OKAY) {
                 pickedFolder = true;
 
                 // 文字コード変換
@@ -202,7 +256,14 @@ int main()
 
                 for (; iter != end; iter.increment(err)) {
                     if (iter->is_regular_file()) {
-                        fileNames.push_back(iter->path().string());
+                        if (iter->path().extension().string() != ".db") {
+                            if (iter->path().filename().string().substr(0, namehead.length()) == namehead) {
+                                fileNames.push_back(iter->path().string());
+                            }
+                        }
+                        else {
+                            std::cout << iter->path().string() << " is not image file" << std::endl;
+                        }
                     }
                 }
 
@@ -218,13 +279,18 @@ int main()
                 // file 読み込み
                 imageBuffer.clear();
                 for (const auto file :fileNames) {
-                    cv::Mat img = cv::imread(file, CV_8UC1);
+                    cv::Mat img = cv::imread(file, rgb);
 
                     if (img.empty()) { continue; };
 
                     // 色変換してみる
-                    cv::Mat img2 = cv::Mat(img.rows, img.cols, CV_8UC3);
-                    cv::cvtColor(img, img2, CV_BayerRG2BGR);
+                    cv::Mat img2 = cv::Mat(img.rows, img.cols, outch);
+                    if (BayerRG) {
+                        cv::cvtColor(img, img2, CV_BayerRG2BGR);
+                    }
+                    else {
+                        img2 = img;
+                    }
 
                     //cv::Mat img3 = cv::Mat(img2.rows, img2.cols, CV_8UC4);
                     //cv::cvtColor(img2, img3, CV_BGR2BGRA);
@@ -236,7 +302,7 @@ int main()
                 flagRedraw = true;
 
             }
-            else if (result == NFD_CANCEL) {
+            else if (nfdResult == NFD_CANCEL) {
                 puts("User pressed cancel.");
             }
             else {
@@ -245,7 +311,7 @@ int main()
         }
 
         if (pickedFolder) {
-            ImGui::Text(folderPath.c_str());
+            ImGui::Text("%s", folderPath.c_str());
             if (ImGui::Button("image view")) {
                 imageView.Enable();
             }
@@ -258,11 +324,20 @@ int main()
             if (numberMix < 1) {
                 numberMix = 1;
             }
+            /*
             if (preNumberMix != numberMix) {
                 flagRedraw = true;
             }
+            */
         }
-        if (ImGui::InputInt("pitch", &numberPitch, 2, 2)) {
+        ImGui::SameLine();
+        ImGui::Text("/ %d", imageBuffer.size());
+        ImGui::SameLine();
+        if (ImGui::Button(" set, redraw")) {
+            flagRedraw;
+        }
+
+        if (ImGui::InputInt("px interval", &numberPitch, 2, 2)) {
             if (numberPitch % 2 != 0) {
                 numberPitch -= numberPitch % 2;
             }
@@ -274,30 +349,9 @@ int main()
             }
         }
         if (flagMixOpe && flagRedraw) {
-            // 合成後のサイズを計算
-            imageViewHeight = imageBuffer[0].rows;
-            imageViewWidth = imageBuffer[0].cols + numberPitch * (numberMix - 1);
-
-            // 調整、4の倍数がいいらしい
-            imageViewWidth = imageViewWidth + (imageViewWidth % 4 == 0 ? 0 : 4 - imageViewWidth % 4);
-
-            // 検算
-            //std::cout << imageViewWidth << std::endl;
-
             // 合成
-            cv::Mat imageRes = cv::Mat::zeros(imageViewHeight, imageViewWidth, imageBuffer[0].type());
-            int oneh = imageViewHeight;
-            int onew = imageBuffer[0].cols;
-            if (numberMix > imageBuffer.size()) { numberMix = (int)imageBuffer.size(); };
-            for (int i = 0; i < numberMix; ++i) {
-                cv::Mat roi = imageRes(cv::Rect(numberPitch * i, 0, onew, oneh));
-                //imageBuffer[i].copyTo(roi);
-                cv::Mat moi = cv::Mat(roi);
-#undef max
-                //moi = 
-                    ((cv::Mat)cv::max(roi, imageBuffer[i])).copyTo(roi);
-                //moi.copyTo(roi);
-            }
+            cv::Mat imageRes;
+            mixImage(imageViewHeight, imageViewWidth, numberMix, numberPitch, imageBuffer, imageRes);
 
             // 検算
             //bool hoge = imageRes.isContinuous();
@@ -330,6 +384,174 @@ int main()
             flagRedraw = false;
         }
 
+        // 保存
+        if (ImGui::Button("save")) {
+            int w;
+            int h;
+            cv::Mat imageRes;
+
+            // 合成
+            mixImage(h, w, numberMix, numberPitch, imageBuffer, imageRes);
+
+            nfdchar_t* outPath;
+            nfdResult = NFD_SaveDialog("png", NULL, &outPath);
+
+            if (nfdResult == NFD_OKAY) {
+                // 文字コード変換
+                std::string u8val(outPath);
+                std::string imagePath = utf8_to_wide_to_multi_winapi(u8val);
+                free(outPath);
+
+                // 保存
+                cv::imwrite(imagePath, imageRes);
+            }
+            else if (nfdResult == NFD_CANCEL) {
+                puts("User pressed cancel.");
+            }
+            else {
+                printf("Error: %s\n", NFD_GetError());
+            }
+
+        }
+
+        
+        ImGui::Separator();
+
+        // 集合画像
+        ImGui::Text(u8"同じ場所での合成");
+        if (ImGui::Button("pick images")) {
+            // NFD呼び出し
+            nfdResult = NFD_OpenDialogMultiple(nullptr, nullptr, &outfiles);
+
+            if (nfdResult == NFD_OKAY) {
+
+                fileNames.clear();
+
+                for (size_t i = 0; i < NFD_PathSet_GetCount(&outfiles); ++i) {
+                    nfdchar_t* onefile = NFD_PathSet_GetPath(&outfiles, i);
+
+                    // 文字コード変換
+                    std::string u8val(onefile);
+                    std::string onepath = utf8_to_wide_to_multi_winapi(u8val);
+                    
+                    fileNames.push_back(onepath);
+                }
+                NFD_PathSet_Free(&outfiles);
+
+                // 集合処理
+                int allImageHeight, allImageWidth;
+
+                cv::Mat imageRes = cv::imread(fileNames[0]);
+
+                allImageHeight = imageRes.rows;
+                allImageWidth = imageRes.cols;
+
+                for (int i = 1; i < fileNames.size(); ++i) {
+                    cv::Mat img = cv::imread(fileNames[i]);
+
+                    int oneh = img.rows;
+                    int onew = img.cols;
+
+                    // 場合分けが雑、まだ不足しているはず
+
+                    if (allImageHeight > oneh || allImageWidth > onew) {
+                        imageRes = imageRes(cv::Rect(0, 0, onew, oneh));
+                        allImageHeight = oneh;
+                        allImageWidth = onew;
+                    }
+
+                    if (allImageHeight < oneh || allImageWidth < onew) {
+                        img = img(cv::Rect(0, 0, allImageWidth, allImageHeight));
+                    }
+
+                    cv::max(imageRes, img, imageRes);
+                    
+                }
+
+                // GLのtextureのサイズに限界があるらしいので、これに合わせて先に縮小しておく
+                if (allImageWidth > glMaxSize) {
+                    float scaleImage = (float)glMaxSize / (float)allImageWidth;
+                    int nextw = glMaxSize;
+                    int nexth = (int)(scaleImage * allImageHeight);
+
+                    cv::Mat img1 = imageRes.clone();
+
+                    imageRes.create(nexth, nextw, img1.type());
+                    cv::resize(img1, imageRes, imageRes.size());
+
+                    allImageWidth = nextw;
+                    allImageHeight = nexth;
+                }
+
+                // 画像ビューア
+                std::string viewname = "images";
+                imageView.ClearBuffer();
+                imageView = ImageWindow(viewname, allImageWidth, allImageHeight, imageRes.channels(), imageRes.data);
+                imageView.Enable();
+
+
+            }
+            else if (nfdResult == NFD_CANCEL) {
+                puts("User pressed cancel.");
+            }
+            else {
+                printf("Error: %s\n", NFD_GetError());
+            }
+        }
+
+        // 集合写真の保存
+        if (ImGui::Button("composed image save")) {
+            nfdchar_t* outPath;
+            nfdResult = NFD_SaveDialog("png", NULL, &outPath);
+
+
+            if (nfdResult == NFD_OKAY) {
+                // 文字コード変換
+                std::string u8val(outPath);
+                std::string imagePath = utf8_to_wide_to_multi_winapi(u8val);
+                free(outPath);
+
+                // 集合処理
+                int allImageHeight, allImageWidth;
+
+                cv::Mat imageRes = cv::imread(fileNames[0]);
+
+                allImageHeight = imageRes.rows;
+                allImageWidth = imageRes.cols;
+
+                for (int i = 1; i < fileNames.size(); ++i) {
+                    cv::Mat img = cv::imread(fileNames[i]);
+
+                    int oneh = img.rows;
+                    int onew = img.cols;
+
+                    // 場合分けが雑、まだ不足しているはず
+
+                    if (allImageHeight > oneh || allImageWidth > onew) {
+                        imageRes = imageRes(cv::Rect(0, 0, onew, oneh));
+                        allImageHeight = oneh;
+                        allImageWidth = onew;
+                    }
+
+                    if (allImageHeight < oneh || allImageWidth < onew) {
+                        img = img(cv::Rect(0, 0, allImageWidth, allImageHeight));
+                    }
+
+                    cv::max(imageRes, img, imageRes);
+
+                }
+
+                // 保存
+                cv::imwrite(imagePath, imageRes);
+            }
+            else if (nfdResult == NFD_CANCEL) {
+                puts("User pressed cancel.");
+            }
+            else {
+                printf("Error: %s\n", NFD_GetError());
+            }
+        }
+
         ImGui::End();
 
         imageView.Display(false);
@@ -356,6 +578,39 @@ int main()
 
 
 
+}
+
+/*
+* 合成処理
+* undef max の都合で本体は最後へ
+* imageViewHeight, imageViewWidth, imageRes は出力
+*/
+void mixImage(int& imageViewHeight, int& imageViewWidth, int numberMix, int numberPitch, std::vector<cv::Mat>& imageBuffer, cv::Mat& imageRes)
+{
+    // 合成後のサイズを計算
+    imageViewHeight = imageBuffer[0].rows;
+    imageViewWidth = imageBuffer[0].cols + numberPitch * (numberMix - 1);
+
+    // 調整、4の倍数がいいらしい
+    imageViewWidth = imageViewWidth + (imageViewWidth % 4 == 0 ? 0 : 4 - imageViewWidth % 4);
+
+    // 検算
+    //std::cout << imageViewWidth << std::endl;
+
+    // 合成
+    imageRes = cv::Mat::zeros(imageViewHeight, imageViewWidth, imageBuffer[0].type());
+    int oneh = imageViewHeight;
+    int onew = imageBuffer[0].cols;
+    if (numberMix > imageBuffer.size()) { numberMix = (int)imageBuffer.size(); };
+    for (int i = 0; i < numberMix; ++i) {
+        cv::Mat roi = imageRes(cv::Rect(numberPitch * i, 0, onew, oneh));
+        //imageBuffer[i].copyTo(roi);
+        cv::Mat moi = cv::Mat(roi);
+#undef max
+        //moi = 
+        ((cv::Mat)cv::max(roi, imageBuffer[i])).copyTo(roi);
+        //moi.copyTo(roi);
+    }
 }
 
 // プログラムの実行: Ctrl + F5 または [デバッグ] > [デバッグなしで開始] メニュー

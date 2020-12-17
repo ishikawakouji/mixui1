@@ -286,7 +286,8 @@ int main()
                     // 色変換してみる
                     cv::Mat img2 = cv::Mat(img.rows, img.cols, outch);
                     if (BayerRG) {
-                        cv::cvtColor(img, img2, CV_BayerRG2BGR);
+                        //cv::cvtColor(img, img2, CV_BayerRG2BGR);
+                        cv::cvtColor(img, img2, CV_BayerBG2BGR); // ライトの色を見て調整
                     }
                     else {
                         img2 = img;

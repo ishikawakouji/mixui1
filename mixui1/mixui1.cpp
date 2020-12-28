@@ -138,6 +138,8 @@ int main()
     nfdchar_t* outFolder = nullptr;
     nfdresult_t nfdResult;
     nfdpathset_t outfiles;
+    int numberReadOffset = 0;
+    int numberReadMax = 80;
 
     // 合成処理
     bool flagMixOpe = false;
@@ -188,6 +190,7 @@ int main()
         * フォルダを選択
         */
         ImGui::SetNextWindowSize(ImVec2(0.f, 0.f));
+
         ImGui::Begin("Image Folder");
         ImGui::Text(u8"連続画像の合成");
 
@@ -242,7 +245,6 @@ int main()
             nfdResult = NFD_PickFolder(nullptr, &outFolder);
 
             if (nfdResult == NFD_OKAY) {
-                pickedFolder = true;
 
                 // 文字コード変換
                 std::string u8val(outFolder);
@@ -278,6 +280,7 @@ int main()
                 // file名をソート
                 std::sort(fileNames.begin(), fileNames.end());
 
+                /*
                 // file 読み込み
                 imageBuffer.clear();
                 for (const auto file :fileNames) {
@@ -303,6 +306,7 @@ int main()
 
                 flagMixOpe = true;
                 flagRedraw = true;
+                */
 
             }
             else if (nfdResult == NFD_CANCEL) {
@@ -311,6 +315,44 @@ int main()
             else {
                 printf("Error: %s\n", NFD_GetError());
             }
+        }
+
+        // 見つかったファイル数
+        ImGui::Text("%d files found", fileNames.size());
+
+        // 読み込むファイルの最初と最大個数を設定
+        ImGui::InputInt("start", &numberReadOffset);
+        ImGui::InputInt("MAX files", &numberReadMax);
+
+        if (ImGui::Button("read files")) {
+            pickedFolder = true;
+
+            // file 読み込み
+            imageBuffer.clear();
+            //for (const auto file : fileNames) {
+            for (int i=numberReadOffset; i < fileNames.size() && i-numberReadOffset < numberReadMax; ++i) {
+                cv::Mat img = cv::imread(fileNames[i], rgb);
+
+                if (img.empty()) { continue; };
+
+                // 色変換してみる
+                cv::Mat img2 = cv::Mat(img.rows, img.cols, outch);
+                if (BayerRG) {
+                    //cv::cvtColor(img, img2, CV_BayerRG2BGR);
+                    cv::cvtColor(img, img2, CV_BayerBG2BGR); // ライトの色を見て調整
+                }
+                else {
+                    img2 = img;
+                }
+
+                //cv::Mat img3 = cv::Mat(img2.rows, img2.cols, CV_8UC4);
+                //cv::cvtColor(img2, img3, CV_BGR2BGRA);
+
+                imageBuffer.push_back(img2);
+            }
+
+            flagMixOpe = true;
+            flagRedraw = true;
         }
 
         if (pickedFolder) {

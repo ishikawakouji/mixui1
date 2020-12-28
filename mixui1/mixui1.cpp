@@ -49,7 +49,7 @@ static void glfw_error_callback(int error, const char* description)
 * 合成処理
 * undef max の都合で本体は最後へ
 */
-extern void mixImage(int& imageViewHeight, int& imageViewWidth, int numberMix, int numberPitch, std::vector<cv::Mat>& imageBuffer, cv::Mat& imageRes);
+extern void mixImage(int& imageViewHeight, int& imageViewWidth, int numberOffset, int numberMix, int numberPitch, std::vector<cv::Mat>& imageBuffer, cv::Mat& imageRes);
 
 // グローバル
 int glfwWidth = 640;
@@ -144,7 +144,7 @@ int main()
     int numberOffset = 0;
     int preNumberOffset = 0;
     int numberMix = 80;
-    int preNumberMix = 80;
+    int preNumberMix = 1;
     int numberPitch = 300;
     int preNumberPitch = 0;
     std::vector<cv::Mat> imageBuffer;
@@ -320,38 +320,40 @@ int main()
             }
         }
 
-        static bool flagImmOffset = true;
+        static bool flagImm = true;
 
-        ImGui::Checkbox("imm. offset", &flagImmOffset);
-        ImGui::SameLine();
+        ImGui::Checkbox("imm.", &flagImm);
+
         ImGui::InputInt("offset", &preNumberOffset, 8, 8);
-        if (flagImmOffset) {
-            numberOffset = preNumberOffset;
-            if ((size_t)numberOffset + numberMix > imageBuffer.size()) {
-                numberOffset = (int)imageBuffer.size() - numberMix;
-            }
-            flagRedraw = true;
-        }
 
-        static bool flagImmMix = true;
-
-        ImGui::Checkbox("imm. mix", &flagImmMix);
-        ImGui::SameLine();
         ImGui::InputInt("mix num", &preNumberMix, 1, 1);
 
-        if (flagImmMix) {
-            numberMix = preNumberMix;
-            if ((size_t)numberOffset + numberMix > imageBuffer.size()) {
-                numberOffset = (int)imageBuffer.size() - numberMix;
-                if (numberOffset < 0) {
-                    numberOffset = 0;
-                    numberMix = (int)imageBuffer.size();
+        if (flagImm) {
+
+            if (numberOffset != preNumberOffset || numberMix != preNumberMix) {
+
+                if (preNumberOffset < 0) {
+                    preNumberOffset = 0;
+                }
+
+                if ((size_t)preNumberOffset + preNumberMix > imageBuffer.size()) {
+                    preNumberOffset = (int)imageBuffer.size() - preNumberMix;
+                    if (preNumberOffset < 0) {
+                        preNumberOffset = 0;
+                        preNumberMix = (int)imageBuffer.size();
+                    }
+                }
+                if (preNumberMix < 1) {
+                    preNumberMix = 1;
+                }
+
+                if (numberOffset != preNumberOffset || numberMix != preNumberMix) {
+                    numberOffset = preNumberOffset;
+                    numberMix = preNumberMix;
+
+                    flagRedraw = true;
                 }
             }
-            if (numberMix < 1) {
-                numberMix = 1;
-            }
-            flagRedraw = true;
         }
 
         ImGui::SameLine();
@@ -363,7 +365,8 @@ int main()
         }
         */
 
-        if (ImGui::InputInt("px interval", &numberPitch, 2, 2)) {
+        ImGui::InputInt("px interval", &numberPitch, 2, 2);
+        if (flagImm) {
             if (numberPitch % 2 != 0) {
                 numberPitch -= numberPitch % 2;
             }
@@ -374,10 +377,11 @@ int main()
                 flagRedraw = true;
             }
         }
+
         if (flagMixOpe && flagRedraw) {
             // 合成
             cv::Mat imageRes;
-            mixImage(imageViewHeight, imageViewWidth, numberMix, numberPitch, imageBuffer, imageRes);
+            mixImage(imageViewHeight, imageViewWidth, numberOffset, numberMix, numberPitch, imageBuffer, imageRes);
 
             // 検算
             //bool hoge = imageRes.isContinuous();
@@ -417,7 +421,7 @@ int main()
             cv::Mat imageRes;
 
             // 合成
-            mixImage(h, w, numberMix, numberPitch, imageBuffer, imageRes);
+            mixImage(h, w, numberOffset, numberMix, numberPitch, imageBuffer, imageRes);
 
             nfdchar_t* outPath;
             nfdResult = NFD_SaveDialog("png", NULL, &outPath);
@@ -611,7 +615,7 @@ int main()
 * undef max の都合で本体は最後へ
 * imageViewHeight, imageViewWidth, imageRes は出力
 */
-void mixImage(int& imageViewHeight, int& imageViewWidth, int numberMix, int numberPitch, std::vector<cv::Mat>& imageBuffer, cv::Mat& imageRes)
+void mixImage(int& imageViewHeight, int& imageViewWidth, int numberOffset, int numberMix, int numberPitch, std::vector<cv::Mat>& imageBuffer, cv::Mat& imageRes)
 {
     // 合成後のサイズを計算
     imageViewHeight = imageBuffer[0].rows;
@@ -628,13 +632,14 @@ void mixImage(int& imageViewHeight, int& imageViewWidth, int numberMix, int numb
     int oneh = imageViewHeight;
     int onew = imageBuffer[0].cols;
     if (numberMix > imageBuffer.size()) { numberMix = (int)imageBuffer.size(); };
+
     for (int i = 0; i < numberMix; ++i) {
         cv::Mat roi = imageRes(cv::Rect(numberPitch * i, 0, onew, oneh));
         //imageBuffer[i].copyTo(roi);
         cv::Mat moi = cv::Mat(roi);
 #undef max
         //moi = 
-        ((cv::Mat)cv::max(roi, imageBuffer[i])).copyTo(roi);
+        ((cv::Mat)cv::max(roi, imageBuffer[numberOffset + i])).copyTo(roi);
         //moi.copyTo(roi);
     }
 }

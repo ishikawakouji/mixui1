@@ -141,8 +141,10 @@ int main()
 
     // 合成処理
     bool flagMixOpe = false;
+    int numberOffset = 0;
+    int preNumberOffset = 0;
     int numberMix = 80;
-    int preNumberMix = 0;
+    int preNumberMix = 80;
     int numberPitch = 300;
     int preNumberPitch = 0;
     std::vector<cv::Mat> imageBuffer;
@@ -318,25 +320,48 @@ int main()
             }
         }
 
-        if (ImGui::InputInt("mix num", &numberMix, 1, 1)) {
-            if (numberMix > imageBuffer.size()) {
-                numberMix = (int)imageBuffer.size();
+        static bool flagImmOffset = true;
+
+        ImGui::Checkbox("imm. offset", &flagImmOffset);
+        ImGui::SameLine();
+        ImGui::InputInt("offset", &preNumberOffset, 8, 8);
+        if (flagImmOffset) {
+            numberOffset = preNumberOffset;
+            if ((size_t)numberOffset + numberMix > imageBuffer.size()) {
+                numberOffset = (int)imageBuffer.size() - numberMix;
+            }
+            flagRedraw = true;
+        }
+
+        static bool flagImmMix = true;
+
+        ImGui::Checkbox("imm. mix", &flagImmMix);
+        ImGui::SameLine();
+        ImGui::InputInt("mix num", &preNumberMix, 1, 1);
+
+        if (flagImmMix) {
+            numberMix = preNumberMix;
+            if ((size_t)numberOffset + numberMix > imageBuffer.size()) {
+                numberOffset = (int)imageBuffer.size() - numberMix;
+                if (numberOffset < 0) {
+                    numberOffset = 0;
+                    numberMix = (int)imageBuffer.size();
+                }
             }
             if (numberMix < 1) {
                 numberMix = 1;
             }
-            /*
-            if (preNumberMix != numberMix) {
-                flagRedraw = true;
-            }
-            */
+            flagRedraw = true;
         }
+
         ImGui::SameLine();
         ImGui::Text("/ %d", imageBuffer.size());
+        /*
         ImGui::SameLine();
         if (ImGui::Button(" set, redraw")) {
             flagRedraw;
         }
+        */
 
         if (ImGui::InputInt("px interval", &numberPitch, 2, 2)) {
             if (numberPitch % 2 != 0) {

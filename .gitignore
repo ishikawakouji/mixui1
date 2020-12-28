@@ -10,6 +10,8 @@
 *.userosscache
 *.sln.docstates
 
+*/imgui.ini
+
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
@@ -59,8 +61,7 @@ artifacts/
 # StyleCop
 StyleCopReport.xml
 
-# ImGui local file
-imgui.ini
+
 
 # Files built by Visual Studio
 *_i.c

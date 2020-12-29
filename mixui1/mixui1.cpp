@@ -407,7 +407,7 @@ int main()
         }
         */
 
-        ImGui::InputInt("px interval", &numberPitch, 2, 2);
+        ImGui::InputInt("px interval", &numberPitch, 1, 2);
         if (flagImm) {
             if (numberPitch % 2 != 0) {
                 numberPitch -= numberPitch % 2;

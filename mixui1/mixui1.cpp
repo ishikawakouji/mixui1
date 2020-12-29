@@ -409,11 +409,13 @@ int main()
 
         ImGui::InputInt("px interval", &numberPitch, 1, 2);
         if (flagImm) {
+            /*
             if (numberPitch % 2 != 0) {
                 numberPitch -= numberPitch % 2;
             }
-            if (numberPitch < 2) {
-                numberPitch = 2;
+            */
+            if (numberPitch < 1) {
+                numberPitch = 1;
             }
             if (preNumberPitch != numberPitch) {
                 flagRedraw = true;

@@ -362,13 +362,13 @@ int main()
             }
         }
 
-        static bool flagImm = true;
+        bool flagImm = false;
 
-        ImGui::Checkbox("imm.", &flagImm);
+        //ImGui::Checkbox("imm.", &flagImm);
 
-        ImGui::InputInt("offset", &preNumberOffset, 8, 8);
+        flagImm |= ImGui::InputInt("offset", &preNumberOffset, 8, 8, ImGuiInputTextFlags_EnterReturnsTrue);
 
-        ImGui::InputInt("mix num", &preNumberMix, 1, 1);
+        flagImm |= ImGui::InputInt("mix num", &preNumberMix, 1, 1, ImGuiInputTextFlags_EnterReturnsTrue);
 
         if (flagImm) {
 
@@ -407,8 +407,7 @@ int main()
         }
         */
 
-        ImGui::InputInt("px interval", &numberPitch, 1, 2);
-        if (flagImm) {
+        if (ImGui::InputInt("px interval", &numberPitch, 1, 2, ImGuiInputTextFlags_EnterReturnsTrue)) {
             /*
             if (numberPitch % 2 != 0) {
                 numberPitch -= numberPitch % 2;

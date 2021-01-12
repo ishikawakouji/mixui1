@@ -351,6 +351,9 @@ int main()
                 imageBuffer.push_back(img2);
             }
 
+            // ファイル個数を反映
+            numberMix = imageBuffer.size();
+
             flagMixOpe = true;
             flagRedraw = true;
         }
@@ -361,6 +364,8 @@ int main()
                 imageView.Enable();
             }
         }
+
+
 
         bool flagImm = false;
 
@@ -387,6 +392,9 @@ int main()
                 }
                 if (preNumberMix < 1) {
                     preNumberMix = 1;
+                }
+                if (preNumberMix > imageBuffer.size()) {
+                    preNumberMix = imageBuffer.size();
                 }
 
                 if (numberOffset != preNumberOffset || numberMix != preNumberMix) {

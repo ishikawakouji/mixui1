@@ -128,7 +128,7 @@ void ImageWindow::Display(bool fcs)
 
     ImGuiIO io = ImGui::GetIO();
 
-    if (ImGui::IsMouseDown(ImGuiMouseButton_::ImGuiMouseButton_Middle) || io.MouseWheel != 0.0f )
+    if (ImGui::IsMouseDown(ImGuiMouseButton_::ImGuiMouseButton_Middle) || ImGui::IsMouseDown(ImGuiMouseButton_::ImGuiMouseButton_Right) || io.MouseWheel != 0.0f )
     {
         fitted = false;
     }
@@ -168,7 +168,13 @@ void ImageWindow::Display(bool fcs)
             }
         }
         else {
-            ImVec2 deltapos = ImGui::GetMouseDragDelta(ImGuiMouseButton_::ImGuiMouseButton_Middle);
+            ImVec2 deltapos;
+            if (ImGui::IsMouseDown(ImGuiMouseButton_::ImGuiMouseButton_Middle)) {
+                deltapos = ImGui::GetMouseDragDelta(ImGuiMouseButton_::ImGuiMouseButton_Middle);
+            }
+            else if (ImGui::IsMouseDown(ImGuiMouseButton_::ImGuiMouseButton_Right)) {
+                deltapos = ImGui::GetMouseDragDelta(ImGuiMouseButton_::ImGuiMouseButton_Right);
+            }
 
             imagePos.x += deltapos.x;
             imagePos.y += deltapos.y;
@@ -176,6 +182,8 @@ void ImageWindow::Display(bool fcs)
 
         ImGui::SetCursorPos(imagePos);
         ImGui::ResetMouseDragDelta(ImGuiMouseButton_::ImGuiMouseButton_Middle);
+        ImGui::ResetMouseDragDelta(ImGuiMouseButton_::ImGuiMouseButton_Right);
+        
     }
 
     ImTextureID imtexture = (ImTextureID)0;

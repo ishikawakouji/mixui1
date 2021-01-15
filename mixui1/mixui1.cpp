@@ -204,7 +204,13 @@ int main()
         static std::string folderPath;
 
         // 全file名
-        static std::vector<std::string> fileNames;
+        class fileinfo {
+        public:
+            std::string name;
+            std::filesystem::file_time_type wtime;
+        };
+        //static std::vector<std::string> fileNames;
+        static std::vector<fileinfo> fileNames;
 
         if (ImGui::Button("Set Folder")) {
             // 頭文字チェック
@@ -262,7 +268,11 @@ int main()
                     if (iter->is_regular_file()) {
                         if (iter->path().extension().string() != ".db") {
                             if (iter->path().filename().string().substr(0, namehead.length()) == namehead) {
-                                fileNames.push_back(iter->path().string());
+                                fileinfo one;
+                                one.name = iter->path().string();
+                                one.wtime = iter->last_write_time();
+                                
+                                fileNames.push_back(one);
                             }
                         }
                         else {
@@ -278,8 +288,12 @@ int main()
                 }
 
                 // file名をソート
-                std::sort(fileNames.begin(), fileNames.end());
-
+                std::sort(fileNames.begin(), fileNames.end(),
+                    [](fileinfo& R, fileinfo& L) -> bool {
+                    return R.wtime < L.wtime;
+                }
+                );
+                
                 /*
                 // file 読み込み
                 imageBuffer.clear();
@@ -331,7 +345,7 @@ int main()
             imageBuffer.clear();
             //for (const auto file : fileNames) {
             for (int i=numberReadOffset; i < fileNames.size() && i-numberReadOffset < numberReadMax; ++i) {
-                cv::Mat img = cv::imread(fileNames[i], rgb);
+                cv::Mat img = cv::imread(fileNames[i].name, rgb);
 
                 if (img.empty()) { continue; };
 
@@ -514,21 +528,24 @@ int main()
                     // 文字コード変換
                     std::string u8val(onefile);
                     std::string onepath = utf8_to_wide_to_multi_winapi(u8val);
+
+                    fileinfo one;
+                    one.name = onepath;
                     
-                    fileNames.push_back(onepath);
+                    fileNames.push_back(one);
                 }
                 NFD_PathSet_Free(&outfiles);
 
                 // 集合処理
                 int allImageHeight, allImageWidth;
 
-                cv::Mat imageRes = cv::imread(fileNames[0]);
+                cv::Mat imageRes = cv::imread(fileNames[0].name);
 
                 allImageHeight = imageRes.rows;
                 allImageWidth = imageRes.cols;
 
                 for (int i = 1; i < fileNames.size(); ++i) {
-                    cv::Mat img = cv::imread(fileNames[i]);
+                    cv::Mat img = cv::imread(fileNames[i].name);
 
                     int oneh = img.rows;
                     int onew = img.cols;
@@ -595,13 +612,13 @@ int main()
                 // 集合処理
                 int allImageHeight, allImageWidth;
 
-                cv::Mat imageRes = cv::imread(fileNames[0]);
+                cv::Mat imageRes = cv::imread(fileNames[0].name);
 
                 allImageHeight = imageRes.rows;
                 allImageWidth = imageRes.cols;
 
                 for (int i = 1; i < fileNames.size(); ++i) {
-                    cv::Mat img = cv::imread(fileNames[i]);
+                    cv::Mat img = cv::imread(fileNames[i].name);
 
                     int oneh = img.rows;
                     int onew = img.cols;
